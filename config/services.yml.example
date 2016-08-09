@@ -1,0 +1,8 @@
+sidekiq:
+  cluster_name:
+    url: http://cluster
+
+rabbitmq:
+  url: http://rabbitmq
+  user: user
+  password: password
