@@ -1,6 +1,12 @@
 sidekiq:
-  cluster_name:
-    url: http://cluster
+  clusters:
+    cluster_name:
+      url: http://cluster
+
+    kappa:
+      url: http://devbox/monitor/stats
+
+  threshold: 100
 
 rabbitmq:
   url: http://rabbitmq
