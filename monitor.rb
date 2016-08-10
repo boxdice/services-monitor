@@ -2,38 +2,51 @@ require "yaml"
 require "net/http"
 require "uri"
 require "json"
+require "slack-notifier"
 
-config = YAML.load_file("config/services.yml")
+@config = YAML.load_file("config/services.yml")
 
-sidekiq = config["sidekiq"]
+def slack_notify(message)
+  slack = @config["slack"]
+  hook = slack["hook"]
+  user = slack["user"]
+  channel = slack["channel"]
+
+  slack_message = ""
+  if slack["annotations"].to_s.empty?
+    slack_message = "<!channel>: \n"
+  else
+    slack_message = slack["annotations"].split(",").map { |slack_user| "<@#{slack_user.strip}>" }.join(", ") + ": \n"
+  end
+  slack_message += message
+
+  notifier = Slack::Notifier.new hook, channel: channel, username: user
+  notifier.ping slack_message
+end
+
+sidekiq = @config["sidekiq"]
 sidekiq["clusters"].each_pair do |cluster, settings|
   uri = URI("#{settings["url"]}")
   response = Net::HTTP.get(uri)
   retry_count = JSON.parse(response)["retry_count"]
   threshold = sidekiq["threshold"]
   if retry_count >= threshold
-    puts "Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached"
+    slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
   end
 end
 
-rabbitmq = config["rabbitmq"]
+rabbitmq = @config["rabbitmq"]
 uri = URI("#{rabbitmq["url"]}/api/queues")
 req = Net::HTTP::Get.new(uri)
 req.basic_auth rabbitmq["user"], rabbitmq["password"]
 res = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(req) }
 
-rabbit_res = {}
+messages = []
 queues = JSON.parse(res.body)
 queues.each do |queue|
   if (queue["messages_ready"] > 0 && queue["messages_ready_details"]["rate"] == 0.0)
-    results = {}
-    name = queue["name"]
-
-    results["consumers"] = queue["consumers"]
-    results["messages_ready"] = queue["messages_ready"]
-    results["rate"] = queue["messages_ready_details"]["rate"]
-    puts "Messages in #{name} queue are not being processed, consumers: #{results["consumers"]}, messages: #{results["messages_ready"]}, rate: #{results["rate"]}"
+    messages << "Messages in #{queue["name"]} queue are not being processed, consumers: #{queue["consumers"]}, messages: #{queue["messages_ready"]}, rate: #{queue["messages_ready_details"]["rate"]}"
   end
-
-  rabbit_res[name] = results
 end
+
+slack_notify(messages.join(",\n")) if messages.any?

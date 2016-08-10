@@ -12,3 +12,9 @@ rabbitmq:
   url: http://rabbitmq
   user: user
   password: password
+
+slack:
+  hook: http://hook
+  channel: channel
+  user: user
+  annotations: annotation1, annotation2
