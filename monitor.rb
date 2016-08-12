@@ -3,6 +3,7 @@ require "net/http"
 require "uri"
 require "json"
 require "slack-notifier"
+require "typhoeus"
 
 @config = YAML.load_file("config/services.yml")
 
@@ -24,16 +25,21 @@ def slack_notify(message)
   notifier.ping slack_message
 end
 
+hydra = Typhoeus::Hydra.new
 sidekiq = @config["sidekiq"]
+threshold = sidekiq["threshold"]
+
 sidekiq["clusters"].each_pair do |cluster, settings|
-  uri = URI("#{settings["url"]}")
-  response = Net::HTTP.get(uri)
-  retry_count = JSON.parse(response)["retry_count"]
-  threshold = sidekiq["threshold"]
-  if retry_count >= threshold
-    slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
+  request = Typhoeus::Request.new(settings["url"], followlocation: true)
+  request.on_complete do |response|
+    retry_count = JSON.parse(response.response_body)["retry_count"]
+    if retry_count >= threshold
+      slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
+    end
   end
+  hydra.queue(request)
 end
+hydra.run
 
 rabbitmq = @config["rabbitmq"]
 uri = URI("#{rabbitmq["url"]}/api/queues")

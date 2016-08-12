@@ -1,13 +1,19 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    ethon (0.8.1)
+      ffi (>= 1.3.0)
+    ffi (1.9.10)
     slack-notifier (1.5.1)
+    typhoeus (1.0.1)
+      ethon (>= 0.8.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   slack-notifier
+  typhoeus
 
 RUBY VERSION
    ruby 2.3.1p112
