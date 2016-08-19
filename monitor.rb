@@ -14,10 +14,10 @@ def slack_notify(message)
   channel = slack["channel"]
 
   slack_message = ""
-  if slack["annotations"].to_s.empty?
+  if slack["user_group"].to_s.empty?
     slack_message = "<!channel>: \n"
   else
-    slack_message = slack["annotations"].split(",").map { |slack_user| "<@#{slack_user.strip}>" }.join(", ") + ": \n"
+    slack_message = "<!subteam^#{slack["user_group_id"]}|#{slack["user_group"]}>: \n"
   end
   slack_message += message
 

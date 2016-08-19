@@ -17,4 +17,5 @@ slack:
   hook: http://hook
   channel: channel
   user: user
-  annotations: annotation1, annotation2
+  user_group: user_group
+  user_group_id: id
