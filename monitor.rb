@@ -1,5 +1,5 @@
 require "yaml"
-require "net/http"
+require "net/https"
 require "uri"
 require "json"
 require "slack-notifier"
@@ -42,10 +42,15 @@ end
 hydra.run
 
 rabbitmq = @config["rabbitmq"]
-uri = URI("#{rabbitmq["url"]}/api/queues")
-req = Net::HTTP::Get.new(uri)
-req.basic_auth rabbitmq["user"], rabbitmq["password"]
-res = Net::HTTP.start(uri.hostname, uri.port) { |http| http.request(req) }
+
+uri = URI.parse("#{rabbitmq["url"]}/api/queues")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+request = Net::HTTP::Get.new(uri.request_uri)
+request.basic_auth rabbitmq["user"], rabbitmq["password"]
+res = http.request(request)
 
 messages = []
 queues = JSON.parse(res.body)
