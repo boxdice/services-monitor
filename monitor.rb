@@ -43,7 +43,7 @@ hydra.run
 
 rabbitmq = @config["rabbitmq"]
 
-uri = URI.parse("#{rabbitmq["url"]}/api/queues")
+uri = URI.parse("#{rabbitmq["url"]}/api/queues?msg_rates_age=300&msg_rates_incr=60")
 http = Net::HTTP.new(uri.host, uri.port)
 http.use_ssl = true
 http.verify_mode = OpenSSL::SSL::VERIFY_NONE
@@ -55,7 +55,12 @@ res = http.request(request)
 messages = []
 queues = JSON.parse(res.body)
 queues.each do |queue|
-  if (queue["messages_ready"] > 0 && queue["messages_ready_details"]["rate"] == 0.0)
+  rate = if queue["message_stats"]
+    queue["message_stats"]["ack_details"]["avg_rate"]
+  else
+    queue["messages_ready_details"]["rate"]
+  end
+  if (queue["messages_ready"] > 0 && rate == 0.0)
     messages << "Messages in #{queue["name"]} queue are not being processed, consumers: #{queue["consumers"]}, messages: #{queue["messages_ready"]}, rate: #{queue["messages_ready_details"]["rate"]}"
   end
 end
