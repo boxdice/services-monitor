@@ -55,7 +55,7 @@ res = http.request(request)
 messages = []
 queues = JSON.parse(res.body)
 queues.each do |queue|
-  rate = if queue["message_stats"]
+  rate = if queue["message_stats"] && queue["message_stats"]["ack_details"]
     queue["message_stats"]["ack_details"]["avg_rate"]
   else
     queue["messages_ready_details"]["rate"]
