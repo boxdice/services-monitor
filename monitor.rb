@@ -30,11 +30,16 @@ sidekiq = @config["sidekiq"]
 threshold = sidekiq["threshold"]
 
 sidekiq["clusters"].each_pair do |cluster, settings|
-  request = Typhoeus::Request.new(settings["url"], followlocation: true)
+  url = settings["url"]
+  request = Typhoeus::Request.new(url, followlocation: true)
   request.on_complete do |response|
-    retry_count = JSON.parse(response.response_body)["retry_count"]
-    if retry_count >= threshold
-      slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
+    if response.success?
+      retry_count = JSON.parse(response.response_body)["retry_count"]
+      if retry_count >= threshold
+        slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
+      end
+    else
+      slack_notify("Failed to get sidekiq stats for url: #{url}")
     end
   end
   hydra.queue(request)
@@ -48,16 +53,21 @@ http = Net::HTTP.new(uri.host, uri.port)
 http.use_ssl = true
 http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
-request = Net::HTTP::Get.new(uri.request_uri)
-request.basic_auth rabbitmq["user"], rabbitmq["password"]
-res = http.request(request)
-
 messages = []
-queues = JSON.parse(res.body)
-queues.each do |queue|
-  if (queue["messages_ready"] > 0 && queue["messages_ready_details"]["rate"] == 0.0)
-    messages << "Messages in #{queue["name"]} queue are not being processed, consumers: #{queue["consumers"]}, messages: #{queue["messages_ready"]}, rate: #{queue["messages_ready_details"]["rate"]}"
+
+begin
+  request = Net::HTTP::Get.new(uri.request_uri)
+  request.basic_auth rabbitmq["user"], rabbitmq["password"]
+  res = http.request(request)
+
+  queues = JSON.parse(res.body)
+  queues.each do |queue|
+    if (queue["messages_ready"] > 0 && queue["messages_ready_details"]["rate"] == 0.0)
+      messages << "Messages in #{queue["name"]} queue are not being processed, consumers: #{queue["consumers"]}, messages: #{queue["messages_ready"]}, rate: #{queue["messages_ready_details"]["rate"]}"
+    end
   end
+rescue Exception => e
+  messages << "Failed to get rabbitmq data, #{e.message}"
 end
 
 slack_notify(messages.join(",\n")) if messages.any?
