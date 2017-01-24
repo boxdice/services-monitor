@@ -5,11 +5,6 @@ sidekiq:
 
   threshold: 100
 
-rabbitmq:
-  url: http://rabbitmq
-  user: user
-  password: password
-
 slack:
   hook: http://hook
   channel: channel

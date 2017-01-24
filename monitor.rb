@@ -46,7 +46,7 @@ sidekiq["clusters"].each_pair do |cluster, settings|
 end
 hydra.run
 
-rabbitmq = @config["rabbitmq"]
+rabbitmq = YAML.load_file('/etc/services-monitor/rabbitmq.yml')
 
 uri = URI.parse("#{rabbitmq["url"]}/api/queues?msg_rates_age=300&msg_rates_incr=60")
 http = Net::HTTP.new(uri.host, uri.port)
@@ -57,7 +57,7 @@ messages = []
 
 begin
   request = Net::HTTP::Get.new(uri.request_uri)
-  request.basic_auth rabbitmq["user"], rabbitmq["password"]
+  request.basic_auth rabbitmq["username"], rabbitmq["password"]
   res = http.request(request)
 
   queues = JSON.parse(res.body)
