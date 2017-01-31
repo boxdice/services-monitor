@@ -25,13 +25,13 @@ def slack_notify(message)
   notifier.ping slack_message
 end
 
-hydra = Typhoeus::Hydra.new
+hydra = Typhoeus::Hydra.new(max_concurrency: 5)
 sidekiq = @config["sidekiq"]
 threshold = sidekiq["threshold"]
 
 sidekiq["clusters"].each_pair do |cluster, settings|
   url = settings["url"]
-  request = Typhoeus::Request.new(url, followlocation: true)
+  request = Typhoeus::Request.new(url, followlocation: true, timeout: 10)
   request.on_complete do |response|
     if response.success?
       retry_count = JSON.parse(response.response_body)["retry_count"]
@@ -39,7 +39,12 @@ sidekiq["clusters"].each_pair do |cluster, settings|
         slack_notify("Threshold of retry count of sidekiq jobs for #{cluster} (retry count: #{retry_count}) was reached")
       end
     else
-      slack_notify("Failed to get sidekiq stats for url: #{url}")
+      if response.timed_out?
+        slack_notify("Request to get retry count of sidekiq jobs timed out for url: #{url}")
+      else
+        # temp comment: too noisy
+        # slack_notify("Failed to get sidekiq stats for url: #{url}")
+      end
     end
   end
   hydra.queue(request)
